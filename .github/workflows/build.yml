@@ -1,0 +1,50 @@
+name: OrangeFox - Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      MANIFEST_BRANCH:
+        description: 'Manifest Branch'
+        default: '12.1'
+        required: true
+        type: choice
+        options: ['12.1', '11.0']
+      DEVICE_TREE:
+        description: 'Device Tree'
+        default: 'https://github.com/Galaxy-MT6768/android_device_samsung_a31x'
+        required: true
+      DEVICE_TREE_BRANCH:
+        description: 'Device Tree Branch'
+        default: 'android-12'
+        required: true
+      DEVICE_PATH:
+        description: 'Device Path'
+        default: 'device/samsung/a31'
+        required: true
+      DEVICE_NAME:
+        description: 'Device Name'
+        default: 'a31'
+        required: true
+      BUILD_TARGET:
+        description: 'Build Target'
+        default: 'recovery'
+        required: true
+        type: choice
+        options: ['recovery', 'boot', 'vendorboot']
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Build OrangeFox
+      uses: yuanshiguang-s-android-warehouse/orangefox-action-builder@main
+      with:
+        MANIFEST_BRANCH: ${{ inputs.MANIFEST_BRANCH }}
+        DEVICE_TREE: ${{ inputs.DEVICE_TREE }}
+        DEVICE_TREE_BRANCH: ${{ inputs.DEVICE_TREE_BRANCH }}
+        DEVICE_PATH: ${{ inputs.DEVICE_PATH }}
+        DEVICE_NAME: ${{ inputs.DEVICE_NAME }}
+        BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
