@@ -54,25 +54,18 @@ jobs:
           git lfs install
           git lfs pull || true
 
-          echo "=== mkbootimg kontrol ==="
           ls -la mkbootimg || { echo "mkbootimg DOSYASI YOK"; exit 1; }
           file mkbootimg
-          head -c 200 mkbootimg; echo
-
-          # LFS pointer ise 40 dk beklemeden burada patla
           if head -c 50 mkbootimg | grep -q "git-lfs"; then
-            echo "mkbootimg bir LFS pointer, gercek dosya degil. Repoya asil dosyayi koy."
+            echo "mkbootimg bir LFS pointer, gercek dosya degil."
             exit 1
           fi
 
-          # Exec bitlerini duzelt
           chmod +x mkbootimg
           find . -type f \( -name "mkbootimg*" -o -name "avbtool*" -o -name "*.py" -o -name "*.sh" \) -exec chmod +x {} \;
-          ls -la mkbootimg
 
           cd /home/runner/fox/fox_12.1
           echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31/BoardConfig.mk
-          echo "=== AndroidProducts.mk ==="
           cat device/samsung/a31/AndroidProducts.mk || echo "AndroidProducts.mk YOK"
 
       - name: Build
@@ -95,12 +88,29 @@ jobs:
             exit 1
           fi
 
-          mka adbd recoveryimage -j4 2>&1 | tee /home/runner/build.log
+          # avbtool host binary'si recoveryimage tarafindan otomatik uretilmiyor
+          mka avbtool -j4 2>&1 | tee /home/runner/build.log
+          AVB=out/host/linux-x86/bin/avbtool
+          if [ ! -f "$AVB" ]; then
+            echo "avbtool hedefi uretmedi, wrapper yaziliyor"
+            SCRIPT=$(find external/avb -maxdepth 1 -name "avbtool*" -type f | head -1)
+            echo "script: $SCRIPT"
+            if [ -z "$SCRIPT" ]; then
+              echo "external/avb icinde avbtool scripti yok"
+              exit 1
+            fi
+            mkdir -p out/host/linux-x86/bin
+            printf '#!/bin/sh\nexec python3 /home/runner/fox/fox_12.1/%s "$@"\n' "$SCRIPT" > "$AVB"
+            chmod +x "$AVB"
+          fi
+          ls -la "$AVB"
+
+          mka adbd recoveryimage -j4 2>&1 | tee -a /home/runner/build.log
           BUILD_RC=${PIPESTATUS[0]}
           echo "build rc=$BUILD_RC"
           if [ $BUILD_RC -ne 0 ]; then
             echo "=== HATA SATIRLARI ==="
-            grep -nE "error:|FAILED:|fatal|Permission denied|No rule to make target" /home/runner/build.log | head -30
+            grep -nE "error:|FAILED:|fatal|Permission denied|No such file|No rule to make target" /home/runner/build.log | head -30
             echo "=== SON 60 SATIR ==="
             tail -60 /home/runner/build.log
             exit 1
