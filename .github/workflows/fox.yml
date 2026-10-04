@@ -1,4 +1,4 @@
-name: OrangeFox - Build A31
+name: OrangeFox - Build A31 - Custom Fork
 
 on:
   workflow_dispatch:
@@ -30,37 +30,29 @@ jobs:
           cd sync
           ./orangefox_sync.sh --branch 12.1 --path /home/runner/fox/fox_12.1
 
-      - name: Clone A31 tree with official touch fix
+      - name: Clone YOUR A31 tree
         run: |
           cd /home/runner/fox/fox_12.1
           rm -rf device/samsung/a31 device/samsung/a31x
-          git clone https://github.com/Galaxy-MT6768/android_device_samsung_a31x -b android-12.1 device/samsung/a31x
-          echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31x/BoardConfig.mk
-          echo "TW_DELAY_TOUCH_INIT_MS := 7000" >> device/samsung/a31x/BoardConfig.mk
-          ls device/samsung/a31x/*.mk
+          git clone https://github.com/KernelMasterX/orangefox-for-galaxy-a31.git device/samsung/a31
+          echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31/BoardConfig.mk
+          echo "TW_DELAY_TOUCH_INIT_MS := 7000" >> device/samsung/a31/BoardConfig.mk
+          ls device/samsung/a31/
 
       - name: Build
         run: |
           cd /home/runner/fox/fox_12.1
           export ALLOW_MISSING_DEPENDENCIES=true
-          export FOX_BUILD_DEVICE=a31x
+          export FOX_BUILD_DEVICE=a31
           export LC_ALL=C
           source build/envsetup.sh
-          lunch twrp_a31x-eng
-          mka adbd recoveryimage -j$(nproc --all)
-
-      - name: Make OrangeFox zip
-        run: |
-          cd /home/runner/fox/fox_12.1
-          find out/target/product/a31x -maxdepth 1 -type f | head -30
-          cp out/target/product/a31x/OrangeFox*.zip ./ || true
-          cp out/target/product/a31x/recovery.img ./OrangeFox-A31-OfficialTouchFix.img || true
-          ls -lh
+          lunch twrp_a31-eng
+          mka recoveryimage -j$(nproc --all)
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: OrangeFox-A31-Fixed
+          name: OrangeFox-A31-Custom
           path: |
-            /home/runner/fox/fox_12.1/OrangeFox*.zip
-            /home/runner/fox/fox_12.1/*.img
+            /home/runner/fox/fox_12.1/out/target/product/a31/OrangeFox*.zip
+            /home/runner/fox/fox_12.1/out/target/product/a31/recovery.img
