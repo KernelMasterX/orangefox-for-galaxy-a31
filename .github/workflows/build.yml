@@ -1,50 +1,53 @@
-name: OrangeFox - Build
+name: OrangeFox - Build A31
 
 on:
   workflow_dispatch:
-    inputs:
-      MANIFEST_BRANCH:
-        description: 'Manifest Branch'
-        default: '12.1'
-        required: true
-        type: choice
-        options: ['12.1', '11.0']
-      DEVICE_TREE:
-        description: 'Device Tree'
-        default: 'https://github.com/Galaxy-MT6768/android_device_samsung_a31x'
-        required: true
-      DEVICE_TREE_BRANCH:
-        description: 'Device Tree Branch'
-        default: 'android-12'
-        required: true
-      DEVICE_PATH:
-        description: 'Device Path'
-        default: 'device/samsung/a31'
-        required: true
-      DEVICE_NAME:
-        description: 'Device Name'
-        default: 'a31'
-        required: true
-      BUILD_TARGET:
-        description: 'Build Target'
-        default: 'recovery'
-        required: true
-        type: choice
-        options: ['recovery', 'boot', 'vendorboot']
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Free space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        df -h
 
-    - name: Build OrangeFox
-      uses: yuanshiguang-s-android-warehouse/orangefox-action-builder@main
+    - name: Install deps
+      run: |
+        sudo apt update
+        sudo apt install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev lib32z1-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip python3 python3-pip schedtool
+
+    - name: Sync Fox 12.1
+      run: |
+        mkdir -p ~/fox && cd ~/fox
+        git clone https://gitlab.com/OrangeFox/sync.git -b master
+        cd sync
+        ./orangefox_sync.sh --branch 12.1 --path ~/fox/fox_12.1
+
+    - name: Clone A31 tree with official touch fix
+      run: |
+        cd ~/fox/fox_12.1
+        git clone https://github.com/Galaxy-MT6768/android_device_samsung_a31x -b android-12 device/samsung/a31
+        # 7 saniye logo fix - dokunmatik
+        echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31/BoardConfig.mk
+        echo "TW_DELAY_TOUCH_INIT_MS := 7000" >> device/samsung/a31/BoardConfig.mk
+
+    - name: Build
+      run: |
+        cd ~/fox/fox_12.1
+        source build/envsetup.sh
+        lunch twrp_a31-eng
+        mka recoveryimage -j$(nproc --all)
+
+    - name: Make OrangeFox zip
+      run: |
+        cd ~/fox/fox_12.1
+        mka adbd
+        cp out/target/product/a31/recovery.img OrangeFox-A31-OfficialTouchFix.img
+        ls -lh *.img
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
       with:
-        MANIFEST_BRANCH: ${{ inputs.MANIFEST_BRANCH }}
-        DEVICE_TREE: ${{ inputs.DEVICE_TREE }}
-        DEVICE_TREE_BRANCH: ${{ inputs.DEVICE_TREE_BRANCH }}
-        DEVICE_PATH: ${{ inputs.DEVICE_PATH }}
-        DEVICE_NAME: ${{ inputs.DEVICE_NAME }}
-        BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
+        name: OrangeFox-A31-Fixed
+        path: ~/fox/fox_12.1/*.img
