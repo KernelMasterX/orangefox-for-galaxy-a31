@@ -21,22 +21,27 @@ jobs:
           sudo mv /tmp/repo /usr/local/bin/repo
           git config --global user.name "runner"
           git config --global user.email "runner@github.com"
-
+          
       - name: Sync Fox 12.1
         run: |
+          set -x
           mkdir -p /home/runner/fox
           cd /home/runner/fox
+          rm -rf sync fox_12.1
           git clone https://gitlab.com/OrangeFox/sync.git --depth=1
           cd sync
           ./orangefox_sync.sh --branch 12.1 --path /home/runner/fox/fox_12.1
+          echo "--- SYNC BITTI, KONTROL ---"
+          ls -lh /home/runner/fox/
+          ls -lh /home/runner/fox/fox_12.1/ | head -20
 
       - name: Clone YOUR A31 tree
         run: |
+          set -x
+          ls -lh /home/runner/fox/fox_12.1/
           cd /home/runner/fox/fox_12.1
           rm -rf device/samsung/a31 device/samsung/a31x
           git clone https://github.com/KernelMasterX/orangefox-for-galaxy-a31.git device/samsung/a31
-          echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31/BoardConfig.mk
-          echo "TW_DELAY_TOUCH_INIT_MS := 7000" >> device/samsung/a31/BoardConfig.mk
           ls device/samsung/a31/
 
       - name: Build
