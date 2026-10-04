@@ -22,9 +22,11 @@ jobs:
 
     - name: Sync Fox 12.1
       run: |
-        mkdir -p ~/fox/fox_12.1 && cd ~/fox/fox_12.1
-        repo init --depth=1 -u https://github.com/OrangeFoxRecovery/sync.git -b fox_12.1 || repo init --depth=1 -u https://gitlab.com/OrangeFox/sync.git -b fox_12.1
-        repo sync -j$(nproc --all) --current-branch --no-clone-bundle --no-tags --optimized-fetch --prune --force-sync
+        mkdir -p ~/fox
+        cd ~/fox
+        git clone https://gitlab.com/OrangeFox/sync.git --depth=1
+        cd sync
+        ./orangefox_sync.sh --branch 12.1 --path ~/fox/fox_12.1
 
     - name: Clone A31 tree with official touch fix
       run: |
