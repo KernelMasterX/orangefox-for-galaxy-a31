@@ -16,6 +16,9 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev lib32z1-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip python3 python3-pip schedtool
+        curl https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
+        chmod a+x /tmp/repo
+        sudo mv /tmp/repo /usr/local/bin/repo
 
     - name: Sync Fox 12.1
       run: |
@@ -28,7 +31,6 @@ jobs:
       run: |
         cd ~/fox/fox_12.1
         git clone https://github.com/Galaxy-MT6768/android_device_samsung_a31x -b android-12 device/samsung/a31
-        # 7 saniye logo fix - dokunmatik
         echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31/BoardConfig.mk
         echo "TW_DELAY_TOUCH_INIT_MS := 7000" >> device/samsung/a31/BoardConfig.mk
 
@@ -42,7 +44,6 @@ jobs:
     - name: Make OrangeFox zip
       run: |
         cd ~/fox/fox_12.1
-        mka adbd
         cp out/target/product/a31/recovery.img OrangeFox-A31-OfficialTouchFix.img
         ls -lh *.img
 
