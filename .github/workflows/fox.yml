@@ -1,4 +1,4 @@
-name: OrangeFox - Build A31
+name: OrangeFox - Build A31 Fixed
 
 on:
   workflow_dispatch:
@@ -19,18 +19,21 @@ jobs:
         curl https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
         chmod a+x /tmp/repo
         sudo mv /tmp/repo /usr/local/bin/repo
+        git config --global user.name "runner"
+        git config --global user.email "runner@github.com"
 
     - name: Sync Fox 12.1
       run: |
-        mkdir -p ~/fox
-        cd ~/fox
+        mkdir -p $HOME/fox
+        cd $HOME/fox
         git clone https://gitlab.com/OrangeFox/sync.git --depth=1
         cd sync
-        ./orangefox_sync.sh --branch 12.1 --path ~/fox/fox_12.1
+        ./orangefox_sync.sh --branch 12.1 --path $HOME/fox/fox_12.1
+        ls $HOME/fox/fox_12.1 -lh
 
     - name: Clone A31 tree with official touch fix
       run: |
-        cd ~/fox/fox_12.1
+        cd $HOME/fox/fox_12.1
         rm -rf device/samsung/a31 device/samsung/a31x
         git clone https://github.com/Galaxy-MT6768/android_device_samsung_a31x -b android-12.1 device/samsung/a31x || git clone https://github.com/Galaxy-MT6768/android_device_samsung_a31x -b android-12 device/samsung/a31x
         echo "TW_SCREEN_BLANK_ON_BOOT := true" >> device/samsung/a31x/BoardConfig.mk
@@ -39,7 +42,7 @@ jobs:
 
     - name: Build
       run: |
-        cd ~/fox/fox_12.1
+        cd $HOME/fox/fox_12.1
         export ALLOW_MISSING_DEPENDENCIES=true
         export FOX_BUILD_DEVICE=a31x
         export LC_ALL=C
@@ -49,7 +52,7 @@ jobs:
 
     - name: Make OrangeFox zip
       run: |
-        cd ~/fox/fox_12.1
+        cd $HOME/fox/fox_12.1
         find out/target/product/a31x -maxdepth 1 -type f | head -30
         cp out/target/product/a31x/OrangeFox*.zip ./ || true
         cp out/target/product/a31x/recovery.img ./OrangeFox-A31-OfficialTouchFix.img || true
@@ -60,5 +63,5 @@ jobs:
       with:
         name: OrangeFox-A31-Fixed
         path: |
-          ~/fox/fox_12.1/OrangeFox*.zip
-          ~/fox/fox_12.1/*.img
+          /home/runner/fox/fox_12.1/OrangeFox*.zip
+          /home/runner/fox/fox_12.1/*.img
