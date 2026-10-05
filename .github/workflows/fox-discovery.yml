@@ -1,4 +1,4 @@
-name: Tema Ara
+name: Tema Ara 2
 
 on:
   workflow_dispatch:
@@ -9,44 +9,54 @@ jobs:
     env:
       GIT_TERMINAL_PROMPT: "0"
     steps:
-      - name: Clone
+      - name: Repo listesi
         run: |
-          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/bootable_recovery.git rec || echo "REC CLONE BASARISIZ"
-          git clone --depth=1 -b master https://gitlab.com/OrangeFox/vendor/recovery.git vendor \
-            || git clone --depth=1 https://gitlab.com/OrangeFox/vendor/recovery.git vendor \
-            || echo "VENDOR CLONE BASARISIZ"
-          echo "rec: $(git -C rec branch --show-current 2>/dev/null)"
-          ls rec 2>/dev/null | head -30
-          ls vendor 2>/dev/null | head -30
+          for q in recovery bootable theme; do
+            echo "=== search: $q ==="
+            curl -s "https://gitlab.com/api/v4/groups/OrangeFox/projects?search=$q&include_subgroups=true&per_page=50" \
+              | python3 -c "import sys,json; [print(p['path_with_namespace'], '|', p.get('default_branch')) for p in json.load(sys.stdin)]"
+          done
 
-      - name: Ara
+      - name: Manifest ipucu
         run: |
+          git clone --depth=1 https://gitlab.com/OrangeFox/sync.git sync
+          grep -nE "manifest|MANIFEST|gitlab|git clone|repo init" sync/orangefox_sync.sh | head -30
+
+      - name: Vendor tema
+        run: |
+          git clone --depth=1 https://gitlab.com/OrangeFox/vendor/recovery.git vendor
           {
-            echo "=== dark gecen dosyalar ==="
-            grep -rliE "dark" rec vendor 2>/dev/null | head -30
-
+            echo "=== theme_installer ==="
+            find vendor/theme_installer -maxdepth 3 | head -40
             echo
-            echo "=== tema klasorleri ==="
-            find rec vendor -maxdepth 5 -type d -iname "*theme*" 2>/dev/null | head -20
-
+            echo "=== changelog: dark/theme/light ==="
+            grep -niE "dark|light|theme" vendor/Files/changelog.txt | head -40
             echo
-            echo "=== varsayilan tema satirlari ==="
-            grep -rnE "(dark|light).{0,40}(default|value)|(default|value).{0,40}(dark|light)" rec vendor 2>/dev/null | head -50
+            echo "=== vendor metin dosyalarinda tema bayragi ==="
+            grep -rnE "(dark|light|theme)" vendor --include=*.mk --include=*.sh --include=*.prop --include=*.cpp --include=*.xml --include=*.md | head -40
+          } 2>&1 | tee vendor_tema.txt
 
-            echo
-            echo "=== tema ayar degiskenleri ==="
-            grep -rnE "(of_|fox_).{0,30}(dark|light|theme)|(dark|light)_?mode|theme_?(name|style)" rec vendor \
-              --include=*.cpp --include=*.xml --include=*.mk --include=*.sh --include=*.prop 2>/dev/null | head -50
-
-            echo
-            echo "=== build bayraklari ==="
-            grep -rnE "FOX_.*(THEME|DARK|LIGHT)|OF_.*(THEME|DARK|LIGHT)" rec vendor \
-              --include=*.mk --include=*.md --include=*.txt 2>/dev/null | head -30
-          } 2>&1 | tee tema.txt
-
-      - name: Yukle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tema-arama
-          path: tema.txt
+      - name: Bootable recovery dene
+        run: |
+          for repo in OrangeFox/Recovery OrangeFox/bootable_recovery OrangeFox/recovery; do
+            for br in fox_12.1 master main; do
+              if git clone --depth=1 -b $br https://gitlab.com/$repo.git rec 2>/dev/null; then
+                echo "KLONLANDI: $repo ($br)"
+                break 2
+              fi
+            done
+          done
+          if [ -d rec ]; then
+            {
+              echo "=== gui icinde dark ==="
+              grep -rliE "dark" rec/gui | head -20
+              echo
+              echo "=== varsayilan tema satirlari ==="
+              grep -rnE "(dark|light).{0,40}(default|value)|(default|value).{0,40}(dark|light)" rec/gui | head -40
+              echo
+              echo "=== ayar degiskenleri ==="
+              grep -rnE "(of_|fox_).{0,30}(dark|light|theme)|theme_?(name|style)" rec --include=*.cpp --include=*.xml --include=*.mk | head -40
+            } 2>&1 | tee rec_tema.txt
+          else
+            echo "REC KLONLANAMADI, yukaridaki repo listesine bak"
+          fi
