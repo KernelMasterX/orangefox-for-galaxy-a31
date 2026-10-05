@@ -6,40 +6,42 @@ on:
 jobs:
   grep:
     runs-on: ubuntu-22.04
+    env:
+      GIT_TERMINAL_PROMPT: "0"
     steps:
       - name: Clone
         run: |
-          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/Recovery.git rec \
-            || git clone --depth=1 https://gitlab.com/OrangeFox/Recovery.git rec
-          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/vendor/recovery.git vendor \
+          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/bootable_recovery.git rec || echo "REC CLONE BASARISIZ"
+          git clone --depth=1 -b master https://gitlab.com/OrangeFox/vendor/recovery.git vendor \
             || git clone --depth=1 https://gitlab.com/OrangeFox/vendor/recovery.git vendor \
-            || echo "vendor repo yok"
-          echo "rec branch: $(git -C rec branch --show-current)"
-          ls rec | head -30
+            || echo "VENDOR CLONE BASARISIZ"
+          echo "rec: $(git -C rec branch --show-current 2>/dev/null)"
+          ls rec 2>/dev/null | head -30
+          ls vendor 2>/dev/null | head -30
 
       - name: Ara
         run: |
           {
-            echo "=== dark gecen dosyalar (gui) ==="
-            grep -rliE "dark" rec/gui | head -30
+            echo "=== dark gecen dosyalar ==="
+            grep -rliE "dark" rec vendor 2>/dev/null | head -30
 
             echo
             echo "=== tema klasorleri ==="
-            find rec vendor -maxdepth 4 -type d -iname "*theme*" 2>/dev/null | head -20
+            find rec vendor -maxdepth 5 -type d -iname "*theme*" 2>/dev/null | head -20
 
             echo
             echo "=== varsayilan tema satirlari ==="
-            grep -rnE "(dark|light).{0,40}(default|value)|(default|value).{0,40}(dark|light)" rec/gui | head -50
+            grep -rnE "(dark|light).{0,40}(default|value)|(default|value).{0,40}(dark|light)" rec vendor 2>/dev/null | head -50
 
             echo
             echo "=== tema ayar degiskenleri ==="
             grep -rnE "(of_|fox_).{0,30}(dark|light|theme)|(dark|light)_?mode|theme_?(name|style)" rec vendor \
-              --include=*.cpp --include=*.xml --include=*.mk --include=*.sh --include=*.prop | head -50
+              --include=*.cpp --include=*.xml --include=*.mk --include=*.sh --include=*.prop 2>/dev/null | head -50
 
             echo
-            echo "=== build bayraklari (mk) ==="
+            echo "=== build bayraklari ==="
             grep -rnE "FOX_.*(THEME|DARK|LIGHT)|OF_.*(THEME|DARK|LIGHT)" rec vendor \
-              --include=*.mk --include=*.md --include=*.txt | head -30
+              --include=*.mk --include=*.md --include=*.txt 2>/dev/null | head -30
           } 2>&1 | tee tema.txt
 
       - name: Yukle
