@@ -1,4 +1,4 @@
-name: OrangeFox - Build A31 - Custom Fork
+name: OrangeFox - Build A31 - Custom Fork - V2
 
 on:
   workflow_dispatch:
