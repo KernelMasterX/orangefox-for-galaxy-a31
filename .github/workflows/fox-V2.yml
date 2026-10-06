@@ -1,4 +1,4 @@
-name: OrangeFox - Build A31 - Custom Fork - V2
+name: OrangeFox - Build A31 - V2
 
 on:
   workflow_dispatch:
@@ -69,11 +69,25 @@ jobs:
 
           # --- V2 FIXES ---
           BC=device/samsung/a31/BoardConfig.mk
-          sed -i '/TW_SCREEN_BLANK_ON_BOOT/d' $BC
           echo "" >> $BC
           echo "# --- V2 FIXES ---" >> $BC
-          echo "TW_NO_SCREEN_BLANK := true" >> $BC
-          
+          echo "TW_SCREEN_BLANK_ON_BOOT := true" >> $BC
+          echo "OF_FLASHLIGHT_ENABLE := 1" >> $BC
+          echo 'OF_FL_PATH1 := /sys/class/camera/flash/rear_flash' >> $BC
+
+          # --- RENK: kirmizi/mavi kanal ters ---
+          echo "=== PIXEL_FORMAT (once) ==="
+          grep -n "PIXEL_FORMAT" $BC || echo "PIXEL_FORMAT satiri yok"
+          if grep -q 'RGBX_8888' $BC; then
+            sed -i 's/RGBX_8888/BGRA_8888/g' $BC
+          elif grep -q 'BGRA_8888' $BC; then
+            sed -i 's/BGRA_8888/RGBX_8888/g' $BC
+          else
+            echo "PIXEL_FORMAT RGBX/BGRA degil, dokunulmadi"
+          fi
+          echo "=== PIXEL_FORMAT (sonra) ==="
+          grep -n "PIXEL_FORMAT" $BC || true
+
           # --- TEMA + KILIT EKRANI ---
           GUI=bootable/recovery/gui/theme/portrait_hdpi
           test -d $GUI || { echo "GUI KLASORU YOK"; exit 1; }
