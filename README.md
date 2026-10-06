@@ -7,7 +7,6 @@ OrangeFox R12.0for A31 by KernelMasterX
 ### Credits
 - TeamWin for TWRP
 - Zillion for original a31 tree
-- Physwizz for a315g-S kernel
 - Galaxy-MT6768 for base tree
 - OrangeFox Team
 
