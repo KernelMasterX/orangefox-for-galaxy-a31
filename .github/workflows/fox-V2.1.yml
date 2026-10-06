@@ -1,0 +1,164 @@
+name: OrangeFox - Build A31 - V2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          df -h
+
+      - name: Add swap
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Install deps
+        run: |
+          sudo apt update
+          sudo apt install -y git-core git-lfs gnupg flex bison build-essential zip curl \
+            zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses-dev lib32z1-dev \
+            x11proto-core-dev libx11-dev libgl1-mesa-dev libxml2-utils xsltproc unzip \
+            python3 python3-pip python-is-python3 schedtool lz4 libncurses5 rsync bc ccache
+          git config --global user.name "runner"
+          git config --global user.email "runner@github.com"
+          git config --global color.ui false
+          mkdir -p $HOME/.bin
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > $HOME/.bin/repo
+          chmod a+x $HOME/.bin/repo
+          echo "$HOME/.bin" >> $GITHUB_PATH
+
+      - name: Sync Fox 12.1
+        run: |
+          mkdir -p /home/runner/fox
+          git clone https://gitlab.com/OrangeFox/sync.git /home/runner/fox/sync
+          cd /home/runner/fox/sync
+          ./orangefox_sync.sh --branch 12.1 --path /home/runner/fox/fox_12.1
+          test -f /home/runner/fox/fox_12.1/build/envsetup.sh || { echo "SYNC BOZUK: envsetup.sh yok"; exit 1; }
+
+      - name: Clone A31 tree
+        run: |
+          cd /home/runner/fox/fox_12.1
+          rm -rf device/samsung/a31
+          git clone https://github.com/KernelMasterX/orangefox-for-galaxy-a31.git device/samsung/a31
+          cd device/samsung/a31
+
+          git lfs install
+          git lfs pull || true
+
+          ls -la mkbootimg || { echo "mkbootimg DOSYASI YOK"; exit 1; }
+          file mkbootimg
+          if head -c 50 mkbootimg | grep -q "git-lfs"; then
+            echo "mkbootimg bir LFS pointer, gercek dosya degil."
+            exit 1
+          fi
+
+          chmod +x mkbootimg
+          find . -type f \( -name "mkbootimg*" -o -name "avbtool*" -o -name "*.py" -o -name "*.sh" \) -exec chmod +x {} \;
+
+          cd /home/runner/fox/fox_12.1
+          cat device/samsung/a31/AndroidProducts.mk || echo "AndroidProducts.mk YOK"
+
+          # --- V2 FIXES ---
+          BC=device/samsung/a31/BoardConfig.mk
+          echo "" >> $BC
+          echo "# --- V2 FIXES ---" >> $BC
+          echo "TW_SCREEN_BLANK_ON_BOOT := true" >> $BC
+          echo "OF_FLASHLIGHT_ENABLE := 1" >> $BC
+          echo 'OF_FL_PATH1 := /sys/class/camera/flash/rear_flash' >> $BC
+
+          # --- RENK: kirmizi/mavi kanal ters ---
+          echo "=== PIXEL_FORMAT (once) ==="
+          grep -n "PIXEL_FORMAT" $BC || echo "PIXEL_FORMAT satiri yok"
+          if grep -q 'RGBX_8888' $BC; then
+            sed -i 's/RGBX_8888/BGRA_8888/g' $BC
+          elif grep -q 'BGRA_8888' $BC; then
+            sed -i 's/BGRA_8888/RGBX_8888/g' $BC
+          else
+            echo "PIXEL_FORMAT RGBX/BGRA degil, dokunulmadi"
+          fi
+          echo "=== PIXEL_FORMAT (sonra) ==="
+          grep -n "PIXEL_FORMAT" $BC || true
+
+          # --- TEMA + KILIT EKRANI ---
+          GUI=bootable/recovery/gui/theme/portrait_hdpi
+          test -d $GUI || { echo "GUI KLASORU YOK"; exit 1; }
+          cp $GUI/themes/styles/Dark.xml $GUI/themes/style.xml
+          sed -i 's|<variable name="lock_btn" persist="1"/>|<variable name="lock_btn" value="1" persist="1"/>|' $GUI/resources/vars.xml
+          grep -q 'name="theme_style" value="Dark"' $GUI/themes/style.xml || { echo "DARK UYGULANMADI"; exit 1; }
+          grep -q 'name="lock_btn" value="1"' $GUI/resources/vars.xml || { echo "LOCK_BTN UYGULANMADI"; exit 1; }
+          echo "tema + kilit yamasi tamam"
+          # --- V2 FIXES SONU ---
+
+      - name: Build
+        shell: bash {0}
+        run: |
+          cd /home/runner/fox/fox_12.1 || { echo "CD BASARISIZ"; exit 1; }
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_BUILD_DEVICE=a31
+          export LC_ALL=C
+          export USE_CCACHE=1
+
+          source build/envsetup.sh
+          echo "envsetup rc=$?"
+
+          lunch twrp_a31-eng
+          LUNCH_RC=$?
+          echo "lunch rc=$LUNCH_RC"
+          if [ $LUNCH_RC -ne 0 ]; then
+            echo "LUNCH PATLADI: urun adi tree ile uyusmuyor"
+            exit 1
+          fi
+
+          # avbtool host binary'si recoveryimage tarafindan otomatik uretilmiyor
+          mka avbtool -j4 2>&1 | tee /home/runner/build.log
+          AVB=out/host/linux-x86/bin/avbtool
+          if [ ! -f "$AVB" ]; then
+            echo "avbtool hedefi uretmedi, wrapper yaziliyor"
+            SCRIPT=$(find external/avb -maxdepth 1 -name "avbtool*" -type f | head -1)
+            echo "script: $SCRIPT"
+            if [ -z "$SCRIPT" ]; then
+              echo "external/avb icinde avbtool scripti yok"
+              exit 1
+            fi
+            mkdir -p out/host/linux-x86/bin
+            printf '#!/bin/sh\nexec python3 /home/runner/fox/fox_12.1/%s "$@"\n' "$SCRIPT" > "$AVB"
+            chmod +x "$AVB"
+          fi
+          ls -la "$AVB"
+
+          mka adbd recoveryimage -j4 2>&1 | tee -a /home/runner/build.log
+          BUILD_RC=${PIPESTATUS[0]}
+          echo "build rc=$BUILD_RC"
+          if [ $BUILD_RC -ne 0 ]; then
+            echo "=== HATA SATIRLARI ==="
+            grep -nE "error:|FAILED:|fatal|Permission denied|No such file|No rule to make target" /home/runner/build.log | head -30
+            echo "=== SON 60 SATIR ==="
+            tail -60 /home/runner/build.log
+            exit 1
+          fi
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          if-no-files-found: ignore
+          path: /home/runner/build.log
+
+      - name: Upload recovery
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrangeFox-A31-Custom
+          if-no-files-found: warn
+          path: |
+            /home/runner/fox/fox_12.1/out/target/product/a31/OrangeFox*.zip
+            /home/runner/fox/fox_12.1/out/target/product/a31/recovery.img
